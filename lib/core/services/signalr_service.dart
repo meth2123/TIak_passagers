@@ -6,7 +6,9 @@ import 'package:tiak_passenger/core/constants/app_constants.dart';
 import 'package:tiak_passenger/core/models/driver.dart';
 import 'package:tiak_passenger/core/models/trip.dart';
 
-final signalRServiceProvider = Provider<SignalRService>((ref) => SignalRService());
+final signalRServiceProvider = Provider<SignalRService>(
+  (ref) => SignalRService(),
+);
 
 class SignalRService {
   static final SignalRService _instance = SignalRService._internal();
@@ -15,35 +17,258 @@ class SignalRService {
 
   SignalRService._internal();
 
-  io.Socket? _socket;
-  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
-  bool _isConnected = false;
   static const LatLng _defaultDakar = LatLng(14.6928, -17.4467);
+  static const String _driverLocationEvent = 'driver:location-updated';
+  static const String _tripStartedEvent = 'trip:started';
+  static const String _tripCompletedEvent = 'trip:completed';
+  static const String _paymentReceivedEvent = 'payment:received';
+  static const String _driverAcceptedEvent = 'driver:accepted';
+  static const String _driverArrivedEvent = 'driver:arrived';
+  static const String _etaUpdatedEvent = 'driver:eta-updated';
 
-  bool get isConnected => _isConnected;
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  io.Socket? _socket;
+  bool _isConnected = false;
+
+  bool get isConnected => _socket?.connected ?? _isConnected;
 
   Future<void> initialize() async {
     await connect();
   }
 
   Future<void> connect() async {
-    if (_socket != null && _socket!.connected) {
-      _isConnected = true;
+    final token = await _secureStorage.read(key: 'auth_token');
+    if (token == null || token.isEmpty) {
+      await disconnect();
       return;
     }
 
-    final token = await _secureStorage.read(key: 'auth_token');
+    if (_socket != null) {
+      _socket?.disconnect();
+      _socket?.dispose();
+      _socket = null;
+    }
+
     _socket = io.io(
       AppConstants.socketUrl,
       io.OptionBuilder()
           .setTransports(['websocket'])
           .enableAutoConnect()
-          .setExtraHeaders(
-            token == null ? {} : {'authorization': 'Bearer $token'},
-          )
+          .setExtraHeaders({'authorization': 'Bearer $token'})
           .build(),
     );
 
+    _registerConnectionHandlers();
+    _socket?.connect();
+  }
+
+  Future<void> disconnect() async {
+    clearPassengerListeners();
+    _socket?.disconnect();
+    _socket?.dispose();
+    _socket = null;
+    _isConnected = false;
+  }
+
+  void clearPassengerListeners() {
+    for (final event in const [
+      _driverLocationEvent,
+      _tripStartedEvent,
+      _tripCompletedEvent,
+      _paymentReceivedEvent,
+      _driverAcceptedEvent,
+      _driverArrivedEvent,
+      _etaUpdatedEvent,
+    ]) {
+      _socket?.off(event);
+    }
+  }
+
+  void onDriverLocationUpdate({
+    String? driverId,
+    required void Function(Driver driver) callback,
+  }) {
+    _socket?.off(_driverLocationEvent);
+    _socket?.on(_driverLocationEvent, (payload) {
+      final data = _asMap(payload);
+      if (data == null) {
+        return;
+      }
+
+      final driver = Driver(
+        id: (data['driverId'] ?? '').toString(),
+        userId: (data['driverId'] ?? '').toString(),
+        name: (data['driverName'] ?? 'Chauffeur').toString(),
+        phoneNumber: data['driverPhone']?.toString(),
+        rating: ((data['driverRating'] ?? 5) as num).toDouble(),
+        status: DriverStatus.active,
+        isAvailable: true,
+        location: data['lat'] != null && data['lng'] != null
+            ? LatLng(
+                (data['lat'] as num).toDouble(),
+                (data['lng'] as num).toDouble(),
+              )
+            : null,
+      );
+
+      if (driverId != null && driver.id != driverId) {
+        return;
+      }
+
+      callback(driver);
+    });
+  }
+
+  void onTripStatusUpdate({
+    String? tripId,
+    required void Function(Trip trip) callback,
+  }) {
+    _socket?.off(_tripStartedEvent);
+    _socket?.off(_tripCompletedEvent);
+
+    _socket?.on(
+      _tripStartedEvent,
+      (payload) => _emitTripCallback(
+        payload,
+        tripId: tripId,
+        status: TripStatus.inProgress,
+        callback: callback,
+      ),
+    );
+    _socket?.on(
+      _tripCompletedEvent,
+      (payload) => _emitTripCallback(
+        payload,
+        tripId: tripId,
+        status: TripStatus.completed,
+        callback: callback,
+      ),
+    );
+  }
+
+  void onPaymentStatusUpdate({
+    String? tripId,
+    required void Function(String tripId, String status) callback,
+  }) {
+    _socket?.off(_paymentReceivedEvent);
+    _socket?.on(_paymentReceivedEvent, (payload) {
+      final data = _asMap(payload);
+      if (data == null) {
+        return;
+      }
+
+      final receivedTripId = (data['tripId'] ?? '').toString();
+      if (tripId != null && receivedTripId != tripId) {
+        return;
+      }
+
+      callback(receivedTripId, 'received');
+    });
+  }
+
+  void onDriverFound({
+    required void Function(Driver driver) callback,
+  }) {
+    _socket?.off(_driverAcceptedEvent);
+    _socket?.on(_driverAcceptedEvent, (payload) {
+      final data = _asMap(payload);
+      if (data == null) {
+        return;
+      }
+
+      callback(
+        Driver(
+          id: (data['driverId'] ?? '').toString(),
+          userId: (data['driverId'] ?? '').toString(),
+          name: (data['driverName'] ?? 'Chauffeur').toString(),
+          phoneNumber: data['driverPhone']?.toString(),
+          motoModel: (data['motoModel'] ?? '').toString(),
+          plateNumber: (data['plateNumber'] ?? '').toString(),
+          rating: ((data['driverRating'] ?? 5) as num).toDouble(),
+          status: DriverStatus.active,
+          isAvailable: true,
+          location: data['lat'] != null && data['lng'] != null
+              ? LatLng(
+                  (data['lat'] as num).toDouble(),
+                  (data['lng'] as num).toDouble(),
+                )
+              : null,
+        ),
+      );
+    });
+  }
+
+  void onDriverArrived({
+    required void Function() callback,
+  }) {
+    _socket?.off(_driverArrivedEvent);
+    _socket?.on(_driverArrivedEvent, (_) => callback());
+  }
+
+  void onEtaUpdated({
+    required void Function(int etaMinutes, double driverLat, double driverLng)
+        callback,
+  }) {
+    _socket?.off(_etaUpdatedEvent);
+    _socket?.on(_etaUpdatedEvent, (payload) {
+      final data = _asMap(payload);
+      if (data == null) {
+        return;
+      }
+
+      callback(
+        ((data['etaMinutes'] ?? 0) as num).toInt(),
+        ((data['driverLat'] ?? _defaultDakar.latitude) as num).toDouble(),
+        ((data['driverLng'] ?? _defaultDakar.longitude) as num).toDouble(),
+      );
+    });
+  }
+
+  Future<void> sendLocationUpdate(String tripId, double lat, double lng) async {
+    if (!isConnected) {
+      return;
+    }
+
+    _socket?.emit('passenger:location', {
+      'tripId': tripId,
+      'lat': lat,
+      'lng': lng,
+    });
+  }
+
+  Future<void> confirmTripArrival(String tripId) async {
+    if (!isConnected) {
+      return;
+    }
+
+    _socket?.emit('trip:confirm-arrival', {'tripId': tripId});
+  }
+
+  Future<void> disputeTrip(String tripId, String reason) async {
+    if (!isConnected) {
+      return;
+    }
+
+    _socket?.emit('trip:dispute', {'tripId': tripId, 'reason': reason});
+  }
+
+  Future<void> joinTripRoom(String tripId) async {
+    if (!isConnected) {
+      return;
+    }
+
+    _socket?.emit('trip:join', {'tripId': tripId});
+  }
+
+  Future<void> leaveTripRoom(String tripId) async {
+    if (!isConnected) {
+      return;
+    }
+
+    _socket?.emit('trip:leave', {'tripId': tripId});
+  }
+
+  void _registerConnectionHandlers() {
     _socket?.onConnect((_) {
       _isConnected = true;
     });
@@ -57,189 +282,41 @@ class SignalRService {
       // ignore: avoid_print
       print('Socket connection failed: $error');
     });
-
-    _registerConnectionHandlers();
-  }
-
-  Future<void> disconnect() async {
-    _socket?.disconnect();
-    _socket?.dispose();
-    _socket = null;
-    _isConnected = false;
-  }
-
-  void _registerConnectionHandlers() {
-    _socket?.on('connect', (_) => _isConnected = true);
-    _socket?.on('disconnect', (_) => _isConnected = false);
-  }
-
-  // Driver location updates during trip
-  void onDriverLocationUpdate(Function(Driver driver) callback) {
-    _socket?.on('driver:location-updated', (payload) {
-      if (payload is! Map) return;
-      final data = Map<String, dynamic>.from(payload);
-      final driver = Driver(
-        id: (data['driverId'] ?? '').toString(),
-        userId: (data['driverId'] ?? '').toString(),
-        name: 'Chauffeur',
-        rating: 5,
-        status: DriverStatus.active,
-        isAvailable: true,
-        location: data['lat'] != null && data['lng'] != null
-            ? LatLng(
-                (data['lat'] as num).toDouble(),
-                (data['lng'] as num).toDouble(),
-              )
-            : null,
-      );
-      callback(driver);
-    });
-  }
-
-  // Trip status updates
-  void onTripStatusUpdate(Function(Trip trip) callback) {
-    _socket?.on('trip:started', (payload) => _emitTripCallback(payload, callback));
-    _socket?.on('trip:completed', (payload) => _emitTripCallback(payload, callback));
-  }
-
-  // Payment status updates
-  void onPaymentStatusUpdate(Function(String tripId, String status) callback) {
-    _socket?.on('payment:received', (payload) {
-      if (payload is! Map) return;
-      final data = Map<String, dynamic>.from(payload);
-      callback((data['tripId'] ?? '').toString(), 'received');
-    });
-  }
-
-  // Driver found notification
-  void onDriverFound(Function(Driver driver, Trip trip) callback) {
-    _socket?.on('driver:accepted', (payload) {
-      if (payload is! Map) return;
-      final data = Map<String, dynamic>.from(payload);
-
-      final driver = Driver(
-        id: (data['driverId'] ?? '').toString(),
-        userId: (data['driverId'] ?? '').toString(),
-        name: (data['driverName'] ?? 'Chauffeur').toString(),
-        motoModel: (data['motoModel'] ?? '').toString(),
-        plateNumber: (data['plateNumber'] ?? '').toString(),
-        rating: ((data['driverRating'] ?? 5) as num).toDouble(),
-        status: DriverStatus.active,
-        isAvailable: true,
-      );
-
-      final trip = Trip(
-        id: (data['tripId'] ?? '').toString(),
-        passengerId: 'me',
-        pickupLocation: _defaultDakar,
-        dropoffLocation: _defaultDakar,
-        status: TripStatus.driverEnRoute,
-        paymentMethod: PaymentMethod.wave,
-        createdAt: DateTime.now(),
-      );
-
-      callback(driver, trip);
-    });
-  }
-
-  // Trip completed notification
-  void onTripCompleted(Function(Trip trip) callback) {
-    _socket?.on('trip:completed', (payload) => _emitTripCallback(payload, callback));
-  }
-
-  // Driver arrived notification
-  void onDriverArrived(Function(String tripId) callback) {
-    _socket?.on('driver:arrived', (payload) {
-      if (payload is! Map) return;
-      final data = Map<String, dynamic>.from(payload);
-      callback((data['tripId'] ?? '').toString());
-    });
-  }
-
-  // Send location updates during trip
-  Future<void> sendLocationUpdate(String tripId, double lat, double lng) async {
-    if (!_isConnected) return;
-
-    try {
-      _socket?.emit('passenger:location', {
-        'tripId': tripId,
-        'lat': lat,
-        'lng': lng,
-      });
-    } catch (e) {
-      // ignore: avoid_print
-      print('Failed to send location update: $e');
-    }
-  }
-
-  // Confirm trip arrival
-  Future<void> confirmTripArrival(String tripId) async {
-    if (!_isConnected) return;
-
-    try {
-      _socket?.emit('trip:confirm-arrival', {'tripId': tripId});
-    } catch (e) {
-      // ignore: avoid_print
-      print('Failed to confirm trip arrival: $e');
-    }
-  }
-
-  // Dispute trip
-  Future<void> disputeTrip(String tripId, String reason) async {
-    if (!_isConnected) return;
-
-    try {
-      _socket?.emit('trip:dispute', {'tripId': tripId, 'reason': reason});
-    } catch (e) {
-      // ignore: avoid_print
-      print('Failed to dispute trip: $e');
-    }
-  }
-
-  // Join trip room
-  Future<void> joinTripRoom(String tripId) async {
-    if (!_isConnected) return;
-
-    try {
-      _socket?.emit('trip:join', {'tripId': tripId});
-    } catch (e) {
-      // ignore: avoid_print
-      print('Failed to join trip room: $e');
-    }
-  }
-
-  // Leave trip room
-  Future<void> leaveTripRoom(String tripId) async {
-    if (!_isConnected) return;
-
-    try {
-      _socket?.emit('trip:leave', {'tripId': tripId});
-    } catch (e) {
-      // ignore: avoid_print
-      print('Failed to leave trip room: $e');
-    }
   }
 
   void _emitTripCallback(
-    dynamic payload,
-    Function(Trip trip) callback,
-  ) {
-    if (payload is! Map) return;
-    final data = Map<String, dynamic>.from(payload);
+    dynamic payload, {
+    String? tripId,
+    required TripStatus status,
+    required void Function(Trip trip) callback,
+  }) {
+    final data = _asMap(payload);
+    if (data == null) {
+      return;
+    }
 
-    final trip = Trip(
-      id: (data['tripId'] ?? '').toString(),
-      passengerId: 'me',
-      pickupLocation: _defaultDakar,
-      dropoffLocation: _defaultDakar,
-      status: (data['status'] == 'completed')
-          ? TripStatus.completed
-          : TripStatus.inProgress,
-      paymentMethod: PaymentMethod.wave,
-      createdAt: DateTime.now(),
+    final receivedTripId = (data['tripId'] ?? '').toString();
+    if (tripId != null && receivedTripId != tripId) {
+      return;
+    }
+
+    callback(
+      Trip(
+        id: receivedTripId,
+        passengerId: 'me',
+        pickupLocation: _defaultDakar,
+        dropoffLocation: _defaultDakar,
+        status: status,
+        paymentMethod: PaymentMethod.wave,
+        createdAt: DateTime.now(),
+      ),
     );
+  }
 
-    callback(trip);
+  Map<String, dynamic>? _asMap(dynamic payload) {
+    if (payload is Map) {
+      return Map<String, dynamic>.from(payload);
+    }
+    return null;
   }
 }
-

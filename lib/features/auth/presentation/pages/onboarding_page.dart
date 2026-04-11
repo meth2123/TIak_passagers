@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:tiak_passenger/core/constants/app_colors.dart';
+import 'package:tiak_passenger/core/constants/app_constants.dart';
 import 'package:tiak_passenger/core/services/auth_service.dart';
 
 class OnboardingPage extends ConsumerStatefulWidget {
@@ -72,17 +73,38 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         child: Column(
           children: [
             // Skip button
-            Align(
-              alignment: Alignment.topRight,
-              child: TextButton(
-                onPressed: _completeOnboarding,
-                child: Text(
-                  'Passer',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 16,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    AppConstants.displayName,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
+                  TextButton(
+                    onPressed: _completeOnboarding,
+                    child: Text(
+                      'Passer',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            SizedBox(
+              width: 144,
+              child: Image.asset(
+                AppConstants.nuDemLogoAsset,
+                fit: BoxFit.contain,
               ),
             ),
 
@@ -155,17 +177,15 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           // Icon
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: item.color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(60),
-            ),
-            child: Icon(
-              item.icon,
-              size: 60,
-              color: item.color,
+          ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: Image.asset(
+              _currentPage == 1
+                  ? AppConstants.deliveryHeroAsset
+                  : AppConstants.deliveryFrameAsset,
+              width: 170,
+              height: 170,
+              fit: BoxFit.cover,
             ),
           ),
 
@@ -175,9 +195,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           Text(
             item.title,
             style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
             textAlign: TextAlign.center,
           ),
 
@@ -187,9 +207,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           Text(
             item.subtitle,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w400,
-                ),
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w400,
+            ),
             textAlign: TextAlign.center,
           ),
         ],

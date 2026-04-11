@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:tiak_passenger/core/constants/app_colors.dart';
+import 'package:tiak_passenger/core/constants/app_constants.dart';
 import 'package:tiak_passenger/core/models/price_estimate.dart';
 import 'package:tiak_passenger/core/providers/trip_providers.dart';
 import 'package:tiak_passenger/core/services/api_client.dart';
@@ -58,15 +59,26 @@ class _MapPageState extends ConsumerState<MapPage> {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Colors.green.withValues(alpha: 0.12),
-                  Colors.blue.withValues(alpha: 0.10),
+                  AppColors.primary.withValues(alpha: 0.12),
+                  AppColors.secondary.withValues(alpha: 0.22),
                 ],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
             ),
-            child: const Center(
-              child: Icon(Icons.map, size: 120, color: AppColors.textHint),
+            child: Center(
+              child: Opacity(
+                opacity: 0.65,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Image.asset(
+                    AppConstants.deliveryHeroAsset,
+                    width: 220,
+                    height: 160,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
             ),
           ),
 
@@ -143,7 +155,11 @@ class _MapPageState extends ConsumerState<MapPage> {
                       children: [
                         Padding(
                           padding: const EdgeInsets.all(12),
-                          child: Icon(Icons.flag, color: Colors.red, size: 24),
+                          child: Icon(
+                            Icons.flag,
+                            color: AppColors.danger,
+                            size: 24,
+                          ),
                         ),
                         Expanded(
                           child: Column(
@@ -191,7 +207,12 @@ class _MapPageState extends ConsumerState<MapPage> {
                 onTap: () => context.push('/profile'),
                 child: const Padding(
                   padding: EdgeInsets.all(12),
-                  child: Icon(Icons.person_outline, color: AppColors.primary),
+                  child: Image(
+                    image: AssetImage(AppConstants.scooterFrameAsset),
+                    width: 22,
+                    height: 22,
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
             ),

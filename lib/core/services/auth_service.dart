@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:tiak_passenger/core/constants/app_constants.dart';
 import 'package:tiak_passenger/core/models/user.dart';
 import 'package:tiak_passenger/core/services/api_client.dart';
+import 'package:tiak_passenger/core/services/signalr_service.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
@@ -77,8 +79,10 @@ class AuthService {
   Future<void> logout() async {
     await _appBox.delete(_tokenKey);
     await _appBox.delete(_userDataKey);
-    await _appBox.delete(_onboardingKey);
     await _apiClient.logout();
+    if (!kIsWeb) {
+      await SignalRService().disconnect();
+    }
   }
 
   // Auth methods
@@ -95,6 +99,7 @@ class AuthService {
     try {
       final response = await _apiClient.verifyOtp(phone: phoneNumber, code: otp);
       final token = (response['token'] ?? response['accessToken']) as String?;
+      final refreshToken = response['refreshToken'] as String?;
       final userJson = response['user'] as Map<String, dynamic>?;
 
       if (token == null || userJson == null) {
@@ -105,7 +110,13 @@ class AuthService {
 
       await setToken(token);
       _apiClient.setAuthToken(token);
+      if (refreshToken != null && refreshToken.isNotEmpty) {
+        await _apiClient.setRefreshToken(refreshToken);
+      }
       await setUserData(user);
+      if (!kIsWeb) {
+        await SignalRService().connect();
+      }
       return true;
     } catch (_) {
       return false;

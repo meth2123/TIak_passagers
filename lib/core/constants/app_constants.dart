@@ -1,7 +1,18 @@
 class AppConstants {
   // App info
   static const String appName = 'Tiak-Tiak';
+  static const String displayName = 'Nu Dem';
   static const String appVersion = '1.0.0';
+
+  // Assets
+  static const String scooterIconAsset = 'assets/icons/delivery-scooter.png';
+  static const String profileIconAsset = 'assets/icons/profile.png';
+  static const String searchAnimationAsset = 'assets/icons/search.gif';
+  static const String nuDemLogoAsset = 'assets/images/Calque_1.png';
+  static const String deliveryHeroAsset =
+      'assets/images/ab44109568bf66c05b83f2d9ad4d278fdff86f69.jpg';
+  static const String deliveryFrameAsset = 'assets/images/Frame 12.png';
+  static const String scooterFrameAsset = 'assets/images/Frame 13.png';
 
   // API
   static const String baseUrl = String.fromEnvironment(
@@ -27,7 +38,7 @@ class AppConstants {
     defaultValue: '',
   );
 
-  // SignalR
+  // SignalR / WebSocket
   static const String socketUrl = String.fromEnvironment(
     'TIAK_SOCKET_URL',
     defaultValue: baseUrl,

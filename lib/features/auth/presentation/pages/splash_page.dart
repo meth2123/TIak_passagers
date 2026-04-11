@@ -26,13 +26,9 @@ class _SplashPageState extends ConsumerState<SplashPage>
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeIn,
-    ));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+    );
 
     _animationController.forward();
 
@@ -68,6 +64,16 @@ class _SplashPageState extends ConsumerState<SplashPage>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // Logo/Animation
+              SizedBox(
+                width: 180,
+                child: Image.asset(
+                  AppConstants.nuDemLogoAsset,
+                  fit: BoxFit.contain,
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
               Container(
                 width: 120,
                 height: 120,
@@ -76,26 +82,28 @@ class _SplashPageState extends ConsumerState<SplashPage>
                   borderRadius: BorderRadius.circular(60),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
+                      color: Colors.black.withValues(alpha: 0.2),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.motorcycle,
-                  size: 60,
-                  color: AppColors.primary,
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Image.asset(
+                    AppConstants.scooterFrameAsset,
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
 
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
 
               // App Name
               Text(
-                AppConstants.appName,
+                AppConstants.displayName,
                 style: const TextStyle(
-                  fontSize: 32,
+                  fontSize: 30,
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
                 ),
@@ -109,7 +117,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w400,
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                 ),
               ),
 

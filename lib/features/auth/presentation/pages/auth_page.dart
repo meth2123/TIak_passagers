@@ -25,10 +25,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
 
   final FormGroup _otpForm = FormGroup({
     'otp': FormControl<String>(
-      validators: [
-        Validators.required,
-        Validators.pattern(r'^\d{6}$'),
-      ],
+      validators: [Validators.required, Validators.pattern(r'^\d{6}$')],
     ),
   });
 
@@ -74,6 +71,9 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       }
     } catch (e) {
       // Handle error
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Erreur lors de l\'envoi du code')),
       );
@@ -94,19 +94,28 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       final fullPhone = '${AppConstants.phonePrefix} $phoneValue';
       final otp = _otpForm.control('otp').value as String;
 
-      final success = await ref.read(authServiceProvider).verifyOtp(fullPhone, otp);
+      final success = await ref
+          .read(authServiceProvider)
+          .verifyOtp(fullPhone, otp);
 
-      if (success && mounted) {
+      if (!mounted) {
+        return;
+      }
+
+      if (success) {
         context.go('/profile-creation');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Code incorrect')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Code incorrect')));
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erreur de vérification')),
-      );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Erreur de vérification')));
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -129,7 +138,10 @@ class _AuthPageState extends ConsumerState<AuthPage> {
               backgroundColor: Colors.transparent,
               elevation: 0,
               leading: IconButton(
-                icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+                icon: const Icon(
+                  Icons.arrow_back,
+                  color: AppColors.textPrimary,
+                ),
                 onPressed: _goBackToPhone,
               ),
             ),
@@ -141,15 +153,49 @@ class _AuthPageState extends ConsumerState<AuthPage> {
             children: [
               const SizedBox(height: 40),
 
+              Center(
+                child: Column(
+                  children: [
+                    SizedBox(
+                      width: 156,
+                      child: Image.asset(
+                        AppConstants.nuDemLogoAsset,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.asset(
+                        AppConstants.deliveryFrameAsset,
+                        width: 100,
+                        height: 100,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      AppConstants.displayName,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
               // Header
               Text(
                 _isPhoneStep
                     ? AppStrings.enterPhoneNumber
                     : 'Vérifiez votre numéro',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
               ),
 
               const SizedBox(height: 8),
@@ -158,9 +204,9 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                 _isPhoneStep
                     ? 'Nous vous enverrons un code de vérification'
                     : 'Entrez le code à 6 chiffres envoyé au ${_phoneForm.control('phone').value != null ? "${AppConstants.phonePrefix} ${_phoneForm.control('phone').value}" : "votre numéro"}',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(color: AppColors.textSecondary),
               ),
 
               const SizedBox(height: 40),
@@ -190,9 +236,8 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                       Expanded(
                         child: Text(
                           'Utilisez le format: XX XXX XX XX\nExemple: 77 123 45 67',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.textSecondary),
                         ),
                       ),
                     ],
@@ -271,8 +316,8 @@ class _AuthPageState extends ConsumerState<AuthPage> {
               Text(
                 'Renvoyer le code',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+                  color: AppColors.textSecondary,
+                ),
               ),
               const SizedBox(width: 8),
               TextButton(
@@ -280,7 +325,9 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                 child: Text(
                   _resendTimer > 0 ? '(${_resendTimer}s)' : 'Renvoyer',
                   style: TextStyle(
-                    color: _resendTimer > 0 ? AppColors.textHint : AppColors.primary,
+                    color: _resendTimer > 0
+                        ? AppColors.textHint
+                        : AppColors.primary,
                   ),
                 ),
               ),

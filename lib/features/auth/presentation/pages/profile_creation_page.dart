@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:tiak_passenger/core/constants/app_colors.dart';
+import 'package:tiak_passenger/core/constants/app_constants.dart';
 import 'package:tiak_passenger/core/models/user.dart';
 import 'package:tiak_passenger/core/services/auth_service.dart';
 
@@ -9,7 +10,8 @@ class ProfileCreationPage extends ConsumerStatefulWidget {
   const ProfileCreationPage({super.key});
 
   @override
-  ConsumerState<ProfileCreationPage> createState() => _ProfileCreationPageState();
+  ConsumerState<ProfileCreationPage> createState() =>
+      _ProfileCreationPageState();
 }
 
 class _ProfileCreationPageState extends ConsumerState<ProfileCreationPage> {
@@ -27,15 +29,17 @@ class _ProfileCreationPageState extends ConsumerState<ProfileCreationPage> {
   Future<void> _submit() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Le nom est obligatoire')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Le nom est obligatoire')));
       return;
     }
 
     setState(() => _isSaving = true);
     try {
-      await ref.read(authServiceProvider).updateUserProfile(
+      await ref
+          .read(authServiceProvider)
+          .updateUserProfile(
             name: name,
             preferredPayment: _paymentMethod,
             language: _language,
@@ -58,6 +62,29 @@ class _ProfileCreationPageState extends ConsumerState<ProfileCreationPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Center(
+              child: Column(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: Image.asset(
+                      AppConstants.deliveryFrameAsset,
+                      width: 96,
+                      height: 96,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Complétez votre profil',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
             TextField(
               controller: _nameController,
               decoration: const InputDecoration(
@@ -84,7 +111,10 @@ class _ProfileCreationPageState extends ConsumerState<ProfileCreationPage> {
               initialValue: _paymentMethod,
               decoration: const InputDecoration(labelText: 'Paiement préféré'),
               items: const [
-                DropdownMenuItem(value: PaymentMethod.wave, child: Text('Wave')),
+                DropdownMenuItem(
+                  value: PaymentMethod.wave,
+                  child: Text('Wave'),
+                ),
                 DropdownMenuItem(
                   value: PaymentMethod.orangeMoney,
                   child: Text('Orange Money'),
@@ -115,4 +145,3 @@ class _ProfileCreationPageState extends ConsumerState<ProfileCreationPage> {
     );
   }
 }
-

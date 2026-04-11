@@ -238,6 +238,8 @@ class _PaymentMethodPageState extends ConsumerState<PaymentMethodPage> {
           'paymentMethod': selectedMethod,
           'amount': widget.estimatedPrice,
           'deepLink': response['deep_link'] as String?,
+          'pickupAddress': widget.pickupAddress,
+          'dropoffAddress': widget.dropoffAddress,
         },
       );
     } catch (_) {

@@ -12,8 +12,7 @@ class TripsHistoryPage extends ConsumerStatefulWidget {
   const TripsHistoryPage({super.key});
 
   @override
-  ConsumerState<TripsHistoryPage> createState() =>
-      _TripsHistoryPageState();
+  ConsumerState<TripsHistoryPage> createState() => _TripsHistoryPageState();
 }
 
 class _TripsHistoryPageState extends ConsumerState<TripsHistoryPage> {
@@ -90,11 +89,9 @@ class _TripsHistoryPageState extends ConsumerState<TripsHistoryPage> {
                   const SizedBox(width: 8),
                   _FilterChip(
                     label: 'Orange Money',
-                    isSelected:
-                        _selectedFilter == 'orange_money',
+                    isSelected: _selectedFilter == 'orange_money',
                     onTap: () {
-                      setState(() =>
-                          _selectedFilter = 'orange_money');
+                      setState(() => _selectedFilter = 'orange_money');
                       _loadTrips();
                     },
                   ),
@@ -108,29 +105,22 @@ class _TripsHistoryPageState extends ConsumerState<TripsHistoryPage> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null
-                    ? Center(child: Text(_error!))
-                    : _trips.isEmpty
+                ? Center(child: Text(_error!))
+                : _trips.isEmpty
                 ? Center(
                     child: Column(
-                      mainAxisAlignment:
-                          MainAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
                           Icons.history,
                           size: 64,
-                          color: AppColors.textSecondary
-                              .withOpacity(0.3),
+                          color: AppColors.textSecondary.withOpacity(0.3),
                         ),
                         const SizedBox(height: 16),
                         Text(
                           'Aucune course',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(
-                                color:
-                                    AppColors.textSecondary,
-                              ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(color: AppColors.textSecondary),
                         ),
                       ],
                     ),
@@ -167,30 +157,18 @@ class _FilterChip extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primary
-              : Colors.white,
+          color: isSelected ? AppColors.primary : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected
-                ? AppColors.primary
-                : AppColors.border,
+            color: isSelected ? AppColors.primary : AppColors.border,
           ),
         ),
-        padding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 8,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Text(
           label,
-          style: Theme.of(context).textTheme.labelMedium
-              ?.copyWith(
-            color: isSelected
-                ? Colors.white
-                : AppColors.text,
-            fontWeight: isSelected
-                ? FontWeight.w600
-                : FontWeight.normal,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: isSelected ? Colors.white : AppColors.text,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
           ),
         ),
       ),
@@ -226,58 +204,44 @@ class _TripHistoryCard extends StatelessWidget {
           children: [
             // Header: Date + Price
             Row(
-              mainAxisAlignment:
-                  MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Aujourd\'hui à 14:30',
-                      style: Theme.of(context)
-                          .textTheme
-                          .labelSmall
-                          ?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '${trip.actualPriceFcfa ?? trip.estimatedPriceFcfa ?? 0} FCFA',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
                 Container(
                   decoration: BoxDecoration(
-                    color: AppColors
-                        .primaryWithOpacity(0.1),
-                    borderRadius:
-                        BorderRadius.circular(8),
+                    color: AppColors.primaryWithOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
                     vertical: 4,
                   ),
                   child: Text(
-                    trip.paymentMethod ==
-                            PaymentMethod.wave
+                    trip.paymentMethod == PaymentMethod.wave
                         ? 'Wave'
                         : 'Orange Money',
-                    style: Theme.of(context)
-                        .textTheme
-                        .labelSmall
-                        ?.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
@@ -300,8 +264,7 @@ class _TripHistoryCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     trip.pickupAddress ?? 'Départ',
-                    style:
-                        Theme.of(context).textTheme.bodySmall,
+                    style: Theme.of(context).textTheme.bodySmall,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -313,17 +276,12 @@ class _TripHistoryCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.flag,
-                  size: 18,
-                  color: Colors.red,
-                ),
+                Icon(Icons.flag, size: 18, color: AppColors.danger),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     trip.dropoffAddress ?? 'Arrivée',
-                    style:
-                        Theme.of(context).textTheme.bodySmall,
+                    style: Theme.of(context).textTheme.bodySmall,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -336,26 +294,17 @@ class _TripHistoryCard extends StatelessWidget {
 
             // Bottom: Rating + Refaire
             Row(
-              mainAxisAlignment:
-                  MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   children: [
-                    Icon(
-                      Icons.star,
-                      size: 18,
-                      color: AppColors.warning,
-                    ),
+                    Icon(Icons.star, size: 18, color: AppColors.warning),
                     const SizedBox(width: 4),
                     Text(
                       '4.9',
-                      style: Theme.of(context)
-                          .textTheme
-                          .labelSmall
-                          ?.copyWith(
-                            fontWeight:
-                                FontWeight.w600,
-                          ),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
@@ -365,26 +314,19 @@ class _TripHistoryCard extends StatelessWidget {
                   },
                   child: Container(
                     decoration: BoxDecoration(
-                      color: AppColors
-                          .primaryWithOpacity(0.1),
-                      borderRadius:
-                          BorderRadius.circular(8),
+                      color: AppColors.primaryWithOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    padding: const EdgeInsets
-                        .symmetric(
+                    padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 6,
                     ),
                     child: Text(
                       'Refaire',
-                      style: Theme.of(context)
-                          .textTheme
-                          .labelSmall
-                          ?.copyWith(
-                            color: AppColors.primary,
-                            fontWeight:
-                                FontWeight.w600,
-                          ),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
@@ -396,4 +338,3 @@ class _TripHistoryCard extends StatelessWidget {
     );
   }
 }
-

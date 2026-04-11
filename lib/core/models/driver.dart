@@ -6,6 +6,7 @@ class Driver {
   final String id;
   final String userId;
   final String name;
+  final String? phoneNumber;
   final String? photoUrl;
   final String? motoModel;
   final String? plateNumber;
@@ -23,6 +24,7 @@ class Driver {
     required this.id,
     required this.userId,
     required this.name,
+    this.phoneNumber,
     this.photoUrl,
     this.motoModel,
     this.plateNumber,
@@ -42,6 +44,7 @@ class Driver {
       id: json['id'] as String,
       userId: json['userId'] as String,
       name: json['name'] as String,
+      phoneNumber: json['phoneNumber'] as String? ?? json['phone'] as String?,
       photoUrl: json['photoUrl'] as String?,
       motoModel: json['motoModel'] as String?,
       plateNumber: json['plateNumber'] as String?,
@@ -72,6 +75,7 @@ class Driver {
       'id': id,
       'userId': userId,
       'name': name,
+      'phoneNumber': phoneNumber,
       'photoUrl': photoUrl,
       'motoModel': motoModel,
       'plateNumber': plateNumber,

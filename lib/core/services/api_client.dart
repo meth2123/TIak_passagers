@@ -8,6 +8,8 @@ import 'package:tiak_passenger/core/models/driver.dart';
 
 class ApiClient {
   static const String baseUrl = '${AppConstants.baseUrl}/api';
+  static const String _authTokenKey = 'auth_token';
+  static const String _refreshTokenKey = 'refresh_token';
   
   late final Dio _dio;
   final FlutterSecureStorage _secureStorage = 
@@ -27,7 +29,7 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final token = await _secureStorage.read(key: 'auth_token');
+          final token = await _secureStorage.read(key: _authTokenKey);
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
@@ -35,8 +37,7 @@ class ApiClient {
         },
         onError: (error, handler) {
           if (error.response?.statusCode == 401) {
-            // Token expired, handle logout
-            _secureStorage.delete(key: 'auth_token');
+            _secureStorage.delete(key: _authTokenKey);
           }
           return handler.next(error);
         },
@@ -75,10 +76,21 @@ class ApiClient {
       );
       
       // Store token
-      if (response.data['token'] != null) {
+      final accessToken =
+          (response.data['accessToken'] ?? response.data['token']) as String?;
+      final refreshToken = response.data['refreshToken'] as String?;
+
+      if (accessToken != null && accessToken.isNotEmpty) {
         await _secureStorage.write(
-          key: 'auth_token',
-          value: response.data['token'],
+          key: _authTokenKey,
+          value: accessToken,
+        );
+      }
+
+      if (refreshToken != null && refreshToken.isNotEmpty) {
+        await _secureStorage.write(
+          key: _refreshTokenKey,
+          value: refreshToken,
         );
       }
       
@@ -252,27 +264,29 @@ class ApiClient {
 
       return trips.map((item) {
         final json = Map<String, dynamic>.from(item as Map);
+        final driver = json['driver'] as Map<String, dynamic>?;
+        final completedAt = json['completed_at'] != null
+            ? DateTime.parse(json['completed_at'] as String)
+            : null;
 
         return Trip(
           id: json['id'] as String,
           passengerId: 'me',
-          driverId: (json['driver'] as Map<String, dynamic>?)?['id'] as String?,
+          driverId: driver?['id'] as String?,
           pickupLocation: const LatLng(14.6928, -17.4467),
           dropoffLocation: const LatLng(14.7416, -17.5104),
           pickupAddress: json['pickupAddress'] as String?,
           dropoffAddress: json['dropoffAddress'] as String?,
           estimatedPriceFcfa: json['price_fcfa'] as int?,
           actualPriceFcfa: json['price_fcfa'] as int?,
+          actualDistanceKm: (json['distance_km'] as num?)?.toDouble(),
+          actualDurationMin: json['duration_min'] as int?,
           status: TripStatus.completed,
           paymentMethod: (json['method'] == 'orange_money')
               ? PaymentMethod.orangeMoney
               : PaymentMethod.wave,
-          completedAt: json['completed_at'] != null
-              ? DateTime.parse(json['completed_at'] as String)
-              : null,
-          createdAt: json['completed_at'] != null
-              ? DateTime.parse(json['completed_at'] as String)
-              : null,
+          completedAt: completedAt,
+          createdAt: completedAt,
         );
       }).toList();
     } catch (e) {
@@ -334,15 +348,31 @@ class ApiClient {
   /// UTILITY
 
   void setAuthToken(String token) async {
-    await _secureStorage.write(key: 'auth_token', value: token);
+    await _secureStorage.write(key: _authTokenKey, value: token);
+  }
+
+  Future<void> setRefreshToken(String token) async {
+    await _secureStorage.write(key: _refreshTokenKey, value: token);
   }
 
   Future<void> logout() async {
-    await _secureStorage.delete(key: 'auth_token');
+    final refreshToken = await _secureStorage.read(key: _refreshTokenKey);
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      try {
+        await _dio.post('/auth/logout', data: {'refreshToken': refreshToken});
+      } catch (_) {}
+    }
+
+    await _secureStorage.delete(key: _authTokenKey);
+    await _secureStorage.delete(key: _refreshTokenKey);
   }
 
   Future<String?> getAuthToken() async {
-    return await _secureStorage.read(key: 'auth_token');
+    return await _secureStorage.read(key: _authTokenKey);
+  }
+
+  Future<String?> getRefreshToken() async {
+    return await _secureStorage.read(key: _refreshTokenKey);
   }
 }
 

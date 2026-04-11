@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:tiak_passenger/core/constants/app_colors.dart';
+import 'package:tiak_passenger/core/constants/app_constants.dart';
 import 'package:tiak_passenger/core/models/trip.dart';
-import 'package:tiak_passenger/core/services/api_client.dart';
+import 'package:tiak_passenger/core/services/signalr_service.dart';
 
 /// ÉCRAN F — PAIEMENT WAVE/OM
 /// Loader "Ouverture Wave..."
@@ -16,6 +17,8 @@ class PaymentProcessingPage extends ConsumerStatefulWidget {
   final PaymentMethod paymentMethod;
   final int amount;
   final String? deepLink;
+  final String pickupAddress;
+  final String dropoffAddress;
 
   const PaymentProcessingPage({
     super.key,
@@ -23,6 +26,8 @@ class PaymentProcessingPage extends ConsumerStatefulWidget {
     required this.paymentMethod,
     required this.amount,
     this.deepLink,
+    required this.pickupAddress,
+    required this.dropoffAddress,
   });
 
   @override
@@ -30,36 +35,64 @@ class PaymentProcessingPage extends ConsumerStatefulWidget {
       _PaymentProcessingPageState();
 }
 
-class _PaymentProcessingPageState
-    extends ConsumerState<PaymentProcessingPage> {
+class _PaymentProcessingPageState extends ConsumerState<PaymentProcessingPage> {
   late String _paymentStatus = 'opening';
   bool _isConfirming = false;
+  final SignalRService _signalRService = SignalRService();
 
   @override
   void initState() {
     super.initState();
+    _signalRService.connect();
+    _signalRService.onPaymentStatusUpdate(
+      tripId: widget.tripId,
+      callback: (tripId, status) async {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() => _paymentStatus = 'confirmed');
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (!mounted) {
+          return;
+        }
+        _goToDriverSearch();
+      },
+    );
     _initiatePayment();
+  }
+
+  @override
+  void dispose() {
+    _signalRService.clearPassengerListeners();
+    super.dispose();
   }
 
   Future<void> _initiatePayment() async {
     try {
       setState(() => _paymentStatus = 'opening');
 
-      final deepLink = widget.deepLink ??
+      final deepLink =
+          widget.deepLink ??
           (widget.paymentMethod == PaymentMethod.wave
               ? 'wave://pay?amount=${widget.amount}&ref=${widget.tripId}'
               : 'om://pay?amount=${widget.amount}&ref=${widget.tripId}');
 
       // Launch payment app
       if (await canLaunchUrl(Uri.parse(deepLink))) {
-        await launchUrl(Uri.parse(deepLink),
-            mode: LaunchMode.externalApplication);
+        await launchUrl(
+          Uri.parse(deepLink),
+          mode: LaunchMode.externalApplication,
+        );
         setState(() => _paymentStatus = 'waiting');
       } else {
         setState(() => _paymentStatus = 'error');
       }
     } catch (e) {
       setState(() => _paymentStatus = 'error');
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Erreur: ${e.toString()}'),
@@ -75,47 +108,30 @@ class _PaymentProcessingPageState
     }
 
     setState(() => _isConfirming = true);
-    try {
-      await ApiClient().getTrip(widget.tripId);
-      if (!mounted) {
-        return;
-      }
-
-      setState(() => _paymentStatus = 'confirmed');
-
-      await Future.delayed(const Duration(milliseconds: 600));
-      if (!mounted) {
-        return;
-      }
-
-      context.go(
-        '/driver-search',
-        extra: {
-          'tripId': widget.tripId,
-          'amount': widget.amount,
-        },
-      );
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Paiement non confirme. Verifiez dans Wave/Orange Money.'),
-          backgroundColor: AppColors.warning,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isConfirming = false);
-      }
+    setState(() => _paymentStatus = 'confirmed');
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (!mounted) {
+      return;
     }
+    _goToDriverSearch();
+  }
+
+  void _goToDriverSearch() {
+    context.go(
+      '/driver-search',
+      extra: {
+        'tripId': widget.tripId,
+        'pickupAddress': widget.pickupAddress,
+        'dropoffAddress': widget.dropoffAddress,
+        'estimatedPrice': widget.amount,
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async => false, // Prevent back button
+    return PopScope(
+      canPop: false,
       child: Scaffold(
         backgroundColor: Colors.white,
         body: SafeArea(
@@ -126,8 +142,7 @@ class _PaymentProcessingPageState
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 // Animated payment icon
-                if (_paymentStatus == 'opening' ||
-                    _paymentStatus == 'waiting')
+                if (_paymentStatus == 'opening' || _paymentStatus == 'waiting')
                   TweenAnimationBuilder<double>(
                     tween: Tween(begin: 0, end: 1),
                     duration: const Duration(milliseconds: 500),
@@ -139,13 +154,14 @@ class _PaymentProcessingPageState
                           height: 100,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color:
-                                AppColors.primaryWithOpacity(0.1),
+                            color: AppColors.primaryWithOpacity(0.1),
                           ),
-                          child: Icon(
-                            Icons.payment,
-                            size: 60,
-                            color: AppColors.primary,
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Image.asset(
+                              AppConstants.scooterFrameAsset,
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
                       );
@@ -174,29 +190,20 @@ class _PaymentProcessingPageState
                     children: [
                       Text(
                         'Ouverture ${widget.paymentMethod == PaymentMethod.wave ? 'Wave' : 'Orange Money'}...',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'Veuillez confirmer le paiement dans l\'application',
-                        style: Theme.of(context)
-                            .textTheme
-                            .labelMedium
-                            ?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(color: AppColors.textSecondary),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 24),
-                      CircularProgressIndicator(
-                        color: AppColors.primary,
-                      ),
+                      CircularProgressIndicator(color: AppColors.primary),
                     ],
                   ),
                 if (_paymentStatus == 'waiting')
@@ -204,33 +211,26 @@ class _PaymentProcessingPageState
                     children: [
                       Text(
                         'Paiement en attente...',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'Montant: ${widget.amount} FCFA',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(
-                              color: AppColors.primary,
-                            ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(color: AppColors.primary),
                       ),
                       const SizedBox(height: 24),
-                      CircularProgressIndicator(
-                        color: AppColors.primary,
-                      ),
+                      CircularProgressIndicator(color: AppColors.primary),
                       const SizedBox(height: 24),
                       SizedBox(
                         width: double.infinity,
                         height: 52,
                         child: ElevatedButton(
-                          onPressed: _isConfirming ? null : _confirmPaymentAndContinue,
+                          onPressed: _isConfirming
+                              ? null
+                              : _confirmPaymentAndContinue,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             shape: RoundedRectangleBorder(
@@ -238,7 +238,9 @@ class _PaymentProcessingPageState
                             ),
                           ),
                           child: Text(
-                            _isConfirming ? 'VERIFICATION...' : 'J\'AI CONFIRME LE PAIEMENT',
+                            _isConfirming
+                                ? 'VERIFICATION...'
+                                : 'J\'AI CONFIRME LE PAIEMENT',
                           ),
                         ),
                       ),
@@ -249,34 +251,22 @@ class _PaymentProcessingPageState
                     children: [
                       Text(
                         'Paiement confirmé ✓',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(
-                              color: AppColors.success,
-                              fontWeight: FontWeight.w600,
-                            ),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: AppColors.success,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         '${widget.amount} FCFA',
-                        style: Theme.of(context)
-                            .textTheme
-                            .displaySmall
-                            ?.copyWith(
-                              color: AppColors.success,
-                              fontSize: 28,
-                            ),
+                        style: Theme.of(context).textTheme.displaySmall
+                            ?.copyWith(color: AppColors.success, fontSize: 28),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'Recherche de chauffeur...',
-                        style: Theme.of(context)
-                            .textTheme
-                            .labelMedium
-                            ?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(color: AppColors.textSecondary),
                       ),
                     ],
                   ),
@@ -291,12 +281,9 @@ class _PaymentProcessingPageState
                       const SizedBox(height: 16),
                       Text(
                         'Erreur de paiement',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(
-                              color: AppColors.danger,
-                            ),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: AppColors.danger,
+                        ),
                       ),
                       const SizedBox(height: 24),
                       SizedBox(
@@ -307,8 +294,7 @@ class _PaymentProcessingPageState
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             shape: RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                           child: const Text('RÉESSAYER'),
@@ -324,4 +310,3 @@ class _PaymentProcessingPageState
     );
   }
 }
-

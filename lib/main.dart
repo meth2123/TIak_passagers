@@ -158,6 +158,9 @@ class _TiakPassengerAppState extends ConsumerState<TiakPassengerApp> {
                   PaymentMethod.wave,
               amount: extra?['amount'] as int? ?? 0,
               deepLink: extra?['deepLink'] as String?,
+              pickupAddress: extra?['pickupAddress'] as String? ?? 'Depart',
+              dropoffAddress:
+                  extra?['dropoffAddress'] as String? ?? 'Destination',
             );
           },
         ),
@@ -166,6 +169,7 @@ class _TiakPassengerAppState extends ConsumerState<TiakPassengerApp> {
           builder: (context, state) {
             final extra = state.extra as Map<String, dynamic>?;
             return DriverSearchPage(
+              tripId: extra?['tripId'] as String? ?? '',
               pickupAddress: extra?['pickupAddress'] ?? 'Départ',
               dropoffAddress: extra?['dropoffAddress'] ?? 'Arrivée',
               estimatedPrice: extra?['estimatedPrice'] ?? 1750,
@@ -177,6 +181,7 @@ class _TiakPassengerAppState extends ConsumerState<TiakPassengerApp> {
           builder: (context, state) {
             final extra = state.extra as Map<String, dynamic>?;
             return DriverAssignedPage(
+              tripId: extra?['tripId'] as String? ?? '',
               driver: (extra?['driver'] as Driver?) ?? mockDriver,
               destination: extra?['destination'] ?? 'Destination',
               estimatedPrice: extra?['estimatedPrice'] ?? 1750,
@@ -238,7 +243,10 @@ class _TiakPassengerAppState extends ConsumerState<TiakPassengerApp> {
         final isOnboardingDone = authService.isOnboardingCompleted;
         final user = authService.getUserData();
         final needsProfileCompletion =
-            isAuth && ((user?.name.trim().isEmpty ?? true) || user?.name == 'Utilisateur');
+            isAuth &&
+            ((user?.name.trim().isEmpty ?? true) ||
+                user?.name == 'Utilisateur' ||
+                user?.name == 'Passager Tiak-Tiak');
         final path = state.matchedLocation;
 
         if (!isAuth &&

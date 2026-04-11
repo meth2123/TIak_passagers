@@ -2,20 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:tiak_passenger/core/constants/app_colors.dart';
+import 'package:tiak_passenger/core/constants/app_constants.dart';
+import 'package:tiak_passenger/core/models/driver.dart';
+import 'package:tiak_passenger/core/models/trip.dart';
 import 'package:tiak_passenger/core/providers/trip_providers.dart';
+import 'package:tiak_passenger/core/services/api_client.dart';
+import 'package:tiak_passenger/core/services/signalr_service.dart';
 
-/// ÉCRAN G — RECHERCHE CHAUFFEUR
-/// Lottie animation
-/// Cercle rayon Mapbox animé
-/// Si aucun chauffeur 5min → annulation + remboursement
-/// Bouton "Annuler" → remboursement Wave immédiat
+/// ECRAN G - RECHERCHE CHAUFFEUR
 class DriverSearchPage extends ConsumerStatefulWidget {
+  final String tripId;
   final String pickupAddress;
   final String dropoffAddress;
   final int estimatedPrice;
 
   const DriverSearchPage({
     super.key,
+    required this.tripId,
     required this.pickupAddress,
     required this.dropoffAddress,
     required this.estimatedPrice,
@@ -27,66 +30,156 @@ class DriverSearchPage extends ConsumerStatefulWidget {
 
 class _DriverSearchPageState extends ConsumerState<DriverSearchPage>
     with TickerProviderStateMixin {
-  late AnimationController _radiusAnimationController;
-  late AnimationController _pulseAnimationController;
-  int _secondsRemaining = 300; // 5 minutes
+  late final AnimationController _radiusAnimationController;
+  late final AnimationController _pulseAnimationController;
+  final SignalRService _signalRService = SignalRService();
+
+  int _secondsRemaining = 300;
   bool _driverFound = false;
+  bool _isCancelling = false;
 
   @override
   void initState() {
     super.initState();
 
-    // Radius animation
     _radiusAnimationController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat();
 
-    // Pulse animation
     _pulseAnimationController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat();
 
-    // Start countdown
+    _signalRService.connect();
+    _signalRService.onDriverFound(callback: _handleDriverFound);
     _startCountdown();
-  }
-
-  void _startCountdown() {
-    Future.delayed(const Duration(seconds: 1), () {
-      if (mounted && _secondsRemaining > 0 && !_driverFound) {
-        setState(() {
-          _secondsRemaining--;
-        });
-        _startCountdown();
-      } else if (_secondsRemaining == 0 && !_driverFound) {
-        _handleNoDriverFound();
-      }
-    });
-  }
-
-  void _handleNoDriverFound() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Aucun chauffeur disponible. Remboursement en cours...'),
-        backgroundColor: AppColors.danger,
-        duration: const Duration(seconds: 3),
-      ),
-    );
-
-    // TODO: Implement auto-refund
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        context.go('/map');
-      }
-    });
+    _pollTripStatus();
   }
 
   @override
   void dispose() {
+    _signalRService.clearPassengerListeners();
     _radiusAnimationController.dispose();
     _pulseAnimationController.dispose();
     super.dispose();
+  }
+
+  void _startCountdown() {
+    Future.delayed(const Duration(seconds: 1), () {
+      if (!mounted || _driverFound || _isCancelling) {
+        return;
+      }
+
+      if (_secondsRemaining <= 0) {
+        _handleNoDriverFound();
+        return;
+      }
+
+      setState(() {
+        _secondsRemaining--;
+      });
+      _startCountdown();
+    });
+  }
+
+  Future<void> _pollTripStatus() async {
+    if (!mounted || _driverFound || widget.tripId.isEmpty) {
+      return;
+    }
+
+    try {
+      final trip = await ApiClient().getTrip(widget.tripId);
+      ref.read(tripProvider.notifier).setTrip(trip);
+
+      if (!mounted || _driverFound) {
+        return;
+      }
+
+      if (trip.status == TripStatus.inProgress) {
+        context.go('/trip-in-progress', extra: {'trip': trip});
+        return;
+      }
+
+      if (trip.status == TripStatus.driverConfirmed) {
+        context.go('/arrival-confirmation', extra: {'trip': trip});
+        return;
+      }
+    } catch (_) {}
+
+    if (!mounted || _driverFound || _isCancelling) {
+      return;
+    }
+
+    Future.delayed(const Duration(seconds: 4), _pollTripStatus);
+  }
+
+  void _handleDriverFound(Driver driver) {
+    if (!mounted || _driverFound) {
+      return;
+    }
+
+    setState(() {
+      _driverFound = true;
+    });
+
+    ref.read(selectedDriverProvider.notifier).state = driver;
+
+    context.go(
+      '/driver-assigned',
+      extra: {
+        'tripId': widget.tripId,
+        'driver': driver,
+        'destination': widget.dropoffAddress,
+        'estimatedPrice': widget.estimatedPrice,
+      },
+    );
+  }
+
+  Future<void> _handleNoDriverFound() async {
+    await _cancelTrip(
+      message: 'Aucun chauffeur disponible. Annulation en cours...',
+    );
+  }
+
+  Future<void> _cancelTrip({String? message}) async {
+    if (_isCancelling || widget.tripId.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _isCancelling = true;
+    });
+
+    try {
+      await ApiClient().cancelTrip(widget.tripId);
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            message ?? 'Course annulée. Le remboursement sera traité.',
+          ),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Impossible d\'annuler la course pour le moment.'),
+            backgroundColor: AppColors.warning,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        context.go('/map');
+      }
+    }
   }
 
   @override
@@ -101,26 +194,29 @@ class _DriverSearchPageState extends ConsumerState<DriverSearchPage>
         }
         final shouldCancel = await _showCancelConfirmation(context) ?? false;
         if (shouldCancel && mounted) {
-          context.go('/map');
+          await _cancelTrip();
         }
       },
       child: Scaffold(
         backgroundColor: Colors.white,
         body: Stack(
           children: [
-            // Fond carte placeholder
             Container(
               color: AppColors.background,
-              child: const Center(
-                child: Icon(Icons.map_outlined, size: 120, color: AppColors.textHint),
+              child: Center(
+                child: Opacity(
+                  opacity: 0.7,
+                  child: Image.asset(
+                    AppConstants.deliveryHeroAsset,
+                    width: 220,
+                    fit: BoxFit.cover,
+                  ),
+                ),
               ),
             ),
-
-            // Content overlay
             Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // App Bar
                 SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -145,14 +241,17 @@ class _DriverSearchPageState extends ConsumerState<DriverSearchPage>
                         children: [
                           Text(
                             'Recherche de chauffeur',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleLarge
+                            style: Theme.of(context).textTheme.titleLarge
                                 ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                           GestureDetector(
-                            onTap: () {
-                              _showCancelConfirmation(context);
+                            onTap: () async {
+                              final shouldCancel =
+                                  await _showCancelConfirmation(context) ??
+                                  false;
+                              if (shouldCancel && mounted) {
+                                await _cancelTrip();
+                              }
                             },
                             child: const Icon(
                               Icons.close,
@@ -164,21 +263,18 @@ class _DriverSearchPageState extends ConsumerState<DriverSearchPage>
                     ),
                   ),
                 ),
-
-                // Center content: Animation + Timer
                 Padding(
                   padding: const EdgeInsets.all(32),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Pulsing circle animation
                       Stack(
                         alignment: Alignment.center,
                         children: [
-                          // Outer radius circle (animated)
                           ScaleTransition(
-                            scale: _radiusAnimationController
-                                .drive(Tween(begin: 0.8, end: 1.2)),
+                            scale: _radiusAnimationController.drive(
+                              Tween(begin: 0.8, end: 1.2),
+                            ),
                             child: Container(
                               width: 160,
                               height: 160,
@@ -191,8 +287,6 @@ class _DriverSearchPageState extends ConsumerState<DriverSearchPage>
                               ),
                             ),
                           ),
-
-                          // Inner circle with lottie
                           Container(
                             width: 120,
                             height: 120,
@@ -205,28 +299,26 @@ class _DriverSearchPageState extends ConsumerState<DriverSearchPage>
                               ),
                             ),
                             child: Center(
-                              child: Icon(
-                                Icons.two_wheeler,
-                                size: 60,
-                                color: AppColors.primary,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: Image.asset(
+                                  AppConstants.scooterFrameAsset,
+                                  width: 82,
+                                  height: 82,
+                                  fit: BoxFit.cover,
+                                ),
                               ),
                             ),
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 32),
-
-                      // Status text
                       Text(
                         'Nous cherchons un chauffeur...',
                         style: Theme.of(context).textTheme.titleMedium,
                         textAlign: TextAlign.center,
                       ),
-
                       const SizedBox(height: 16),
-
-                      // Timer
                       Container(
                         decoration: BoxDecoration(
                           color: AppColors.warningWithOpacity(0.1),
@@ -243,26 +335,22 @@ class _DriverSearchPageState extends ConsumerState<DriverSearchPage>
                           '${(_secondsRemaining ~/ 60).toString().padLeft(2, '0')}:${(_secondsRemaining % 60).toString().padLeft(2, '0')}',
                           style: Theme.of(context).textTheme.displaySmall
                               ?.copyWith(
-                            color: AppColors.warning,
-                            fontSize: 32,
-                            fontWeight: FontWeight.w700,
-                          ),
+                                color: AppColors.warning,
+                                fontSize: 32,
+                                fontWeight: FontWeight.w700,
+                              ),
                         ),
                       ),
-
                       const SizedBox(height: 8),
-
                       Text(
                         'Annulation automatique après 5 minutes',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ],
                   ),
                 ),
-
-                // Bottom: Cancel button
                 SafeArea(
                   child: Container(
                     width: double.infinity,
@@ -284,9 +372,16 @@ class _DriverSearchPageState extends ConsumerState<DriverSearchPage>
                       width: double.infinity,
                       height: 56,
                       child: OutlinedButton(
-                        onPressed: () {
-                          _showCancelConfirmation(context);
-                        },
+                        onPressed: _isCancelling
+                            ? null
+                            : () async {
+                                final shouldCancel =
+                                    await _showCancelConfirmation(context) ??
+                                    false;
+                                if (shouldCancel && mounted) {
+                                  await _cancelTrip();
+                                }
+                              },
                         style: OutlinedButton.styleFrom(
                           side: const BorderSide(
                             color: AppColors.danger,
@@ -297,12 +392,12 @@ class _DriverSearchPageState extends ConsumerState<DriverSearchPage>
                           ),
                         ),
                         child: Text(
-                          'ANNULER',
+                          _isCancelling ? 'ANNULATION...' : 'ANNULER',
                           style: Theme.of(context).textTheme.titleLarge
                               ?.copyWith(
-                            color: AppColors.danger,
-                            fontWeight: FontWeight.w700,
-                          ),
+                                color: AppColors.danger,
+                                fontWeight: FontWeight.w700,
+                              ),
                         ),
                       ),
                     ),
@@ -319,37 +414,33 @@ class _DriverSearchPageState extends ConsumerState<DriverSearchPage>
   Future<bool?> _showCancelConfirmation(BuildContext context) {
     return showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(
           'Annuler la réservation ?',
           style: Theme.of(context).textTheme.titleLarge,
         ),
         content: Text(
-          'Votre paiement de ${widget.estimatedPrice} FCFA sera remboursé.',
+          'Votre paiement de ${widget.estimatedPrice} FCFA sera remboursé si la course n\'a pas démarré.',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: Text(
               'Continuer la recherche',
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: AppColors.primary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(color: AppColors.primary),
             ),
           ),
           TextButton(
-            onPressed: () {
-              // TODO: Implement refund
-              Navigator.pop(context, true);
-              context.go('/map');
-            },
+            onPressed: () => Navigator.pop(dialogContext, true),
             child: Text(
-              'Annuler & Rembourser',
+              'Annuler la course',
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: AppColors.danger,
-                    fontWeight: FontWeight.w600,
-                  ),
+                color: AppColors.danger,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -357,4 +448,3 @@ class _DriverSearchPageState extends ConsumerState<DriverSearchPage>
     );
   }
 }
-

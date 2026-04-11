@@ -2,26 +2,26 @@ import 'package:flutter/material.dart';
 
 class AppColors {
   // Primary colors
-  static const Color primary = Color(0xFFFF6B35); // Orange Dakar
-  static const Color secondary = Color(0xFF004E89); // Bleu confiance
-  static const Color success = Color(0xFF2ECC71); // Vert paiement
-  static const Color warning = Color(0xFFF39C12); // Orange attente
-  static const Color danger = Color(0xFFE74C3C); // Rouge litige
+  static const Color primary = Color(0xFF66C2A4);
+  static const Color secondary = Color(0xFFCFEFE3);
+  static const Color success = Color(0xFF2F9E78);
+  static const Color warning = Color(0xFFE5AA4D);
+  static const Color danger = Color(0xFFE06A7D);
 
   // Background colors
-  static const Color background = Color(0xFFF8F9FA);
+  static const Color background = Color(0xFFF7FBF9);
   static const Color surface = Colors.white;
-  static const Color cardBackground = Colors.white;
+  static const Color cardBackground = Color(0xFFFCFFFD);
 
   // Text colors
-  static const Color textPrimary = Color(0xFF2C3E50);
-  static const Color textSecondary = Color(0xFF6C757D);
-  static const Color textHint = Color(0xFFADB5BD);
+  static const Color textPrimary = Color(0xFF18332A);
+  static const Color textSecondary = Color(0xFF5F7B71);
+  static const Color textHint = Color(0xFFABC0B8);
   static const Color text = textPrimary;
 
   // Border colors
-  static const Color border = Color(0xFFE9ECEF);
-  static const Color borderLight = Color(0xFFF8F9FA);
+  static const Color border = Color(0xFFD5E7E0);
+  static const Color borderLight = Color(0xFFEAF4F0);
 
   // Status colors
   static const Color online = success;
@@ -29,8 +29,8 @@ class AppColors {
   static const Color busy = warning;
 
   // Payment method colors
-  static const Color waveOrange = Color(0xFFFF6B35);
-  static const Color orangeMoneyBlue = Color(0xFF004E89);
+  static const Color waveOrange = Color(0xFF2F7D5B);
+  static const Color orangeMoneyBlue = Color(0xFF3D8E6D);
 
   // Map colors
   static const Color mapMarker = primary;
@@ -64,7 +64,8 @@ class AppTheme {
       ),
 
       // Fonts - use system fonts instead of custom ones not loaded yet
-      fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif',
+      fontFamily:
+          '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif',
       textTheme: const TextTheme(
         displayLarge: TextStyle(
           fontSize: 32,
@@ -155,10 +156,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
 
@@ -170,20 +168,14 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
 
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.primary,
-          textStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
 
@@ -207,11 +199,11 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.danger),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        hintStyle: const TextStyle(
-          color: AppColors.textHint,
-          fontSize: 16,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
         ),
+        hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 16),
         labelStyle: const TextStyle(
           color: AppColors.textSecondary,
           fontSize: 16,
@@ -223,9 +215,7 @@ class AppTheme {
         color: AppColors.cardBackground,
         shadowColor: Colors.black.withValues(alpha: 0.1),
         elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
 
       // App bar theme
